@@ -1,5 +1,4 @@
-#include <intrin.h>
-
+#include <type_traits>
 #include "Simd.h"
 
 void AddMultipliedSimpleSSE(float* dst, const float* src, int n, float coeff)
@@ -885,7 +884,6 @@ template<int i0, int i1, int i2, int i3> forceinline Simd::float4 shuffle(const 
 	>(s0, i2 >= 4? s4: (i3 >= 4? s2: s0));
 }
 
-#include <type_traits>
 
 template<int i1, int i2, int i3> std::enable_if_t<(i3  == 2)>
 	process_sse_impl_shuffle(const float* src, const Simd::float4& src0, Simd::float4& src2, Simd::float4& src4)

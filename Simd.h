@@ -80,8 +80,8 @@
 
 namespace Simd {
 
-template<class T> using ScalarTypeOf = decltype(T()[0]);
-template<class T> using IntAnalogOf = decltype(T() < T());
+template<class T> using ScalarTypeOf = typename std::remove_reference<decltype(T()[0])>::type;
+template<class T> using IntAnalogOf = typename std::remove_reference<decltype(T() < T())>::type;
 
 }
 
@@ -107,14 +107,14 @@ template<typename T> forceinline T Set(ScalarTypeOf<T> v) noexcept
 	return result;
 }
 
-forceinline int4 Load4(const int* src) {return {src[0], src[1], src[2], src[3]};}
-forceinline int4 Load4Aligned(const int* src) {return {src[0], src[1], src[2], src[3]};}
-forceinline float4 Load4(const float* src) {return {src[0], src[1], src[2], src[3]};}
-forceinline float4 Load4Aligned(const float* src) {return {src[0], src[1], src[2], src[3]};}
-forceinline int8 Load8(const int* src) {return {src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
-forceinline int8 Load8Aligned(const int* src) {return {src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
-forceinline float8 Load8(const float* src) {return {src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
-forceinline float8 Load8Aligned(const float* src) {return {src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
+forceinline int4 Load4(const int* src) {return int4{src[0], src[1], src[2], src[3]};}
+forceinline int4 Load4Aligned(const int* src) {return int4{src[0], src[1], src[2], src[3]};}
+forceinline float4 Load4(const float* src) {return float4{src[0], src[1], src[2], src[3]};}
+forceinline float4 Load4Aligned(const float* src) {return float4{src[0], src[1], src[2], src[3]};}
+forceinline int8 Load8(const int* src) {return int8{src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
+forceinline int8 Load8Aligned(const int* src) {return int8{src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
+forceinline float8 Load8(const float* src) {return float8{src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
+forceinline float8 Load8Aligned(const float* src) {return float8{src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7]};}
 template<typename T> forceinline void Store(T v, ScalarTypeOf<T>* dst) {for(int i = 0; i<sizeof(v)/sizeof(v[0]); i++) dst[i] = v[i];}
 template<typename T> forceinline void StoreAligned(T v, ScalarTypeOf<T>* dst) {for(int i = 0; i<sizeof(v)/sizeof(v[0]); i++) dst[i] = v[i];}
 
@@ -171,16 +171,16 @@ template<typename T> forceinline T Max(T a, T b) noexcept {return a > b? a: b;}
 #endif
 
 forceinline int4 TruncateToInt(float4 v) noexcept
-{return {int(v[0]), int(v[1]), int(v[2]), int(v[3])};}
+{return int4{int(v[0]), int(v[1]), int(v[2]), int(v[3])};}
 
 forceinline float4 CastToFloat(int4 v) noexcept
-{return {float(v[0]), float(v[1]), float(v[2]), float(v[3])};}
+{return float4{float(v[0]), float(v[1]), float(v[2]), float(v[3])};}
 
 forceinline int8 TruncateToInt(float8 v) noexcept
-{return {int(v[0]), int(v[1]), int(v[2]), int(v[3]), int(v[4]), int(v[5]), int(v[6]), int(v[7])};}
+{return int8{int(v[0]), int(v[1]), int(v[2]), int(v[3]), int(v[4]), int(v[5]), int(v[6]), int(v[7])};}
 
 forceinline float8 CastToFloat(int8 v) noexcept
-{return {float(v[0]), float(v[1]), float(v[2]), float(v[3]), float(v[4]), float(v[5]), float(v[6]), float(v[7])};}
+{return float8{float(v[0]), float(v[1]), float(v[2]), float(v[3]), float(v[4]), float(v[5]), float(v[6]), float(v[7])};}
 
 template<int i0a, int i1a, int i2b, int i3b, typename T> forceinline T Shuffle22(const T& a, const T& b) noexcept
 {
@@ -190,19 +190,19 @@ template<int i0a, int i1a, int i2b, int i3b, typename T> forceinline T Shuffle22
 		0 <= i2b && i2b <= 3 &&
 		0 <= i3b && i3b <= 3,
 		"Valid range of shuffle indices is [0; 3]");
-	return {a[i0a], a[i1a], b[i2b], b[i3b]};
+	return T{a[i0a], a[i1a], b[i2b], b[i3b]};
 }
 
 forceinline void End() noexcept {}
 
 forceinline int4 SIMD_VECTORCALL UnsignedRightBitShift(int4 x, int bits) noexcept
-{return {unsigned(x[0]) >> bits, unsigned(x[1]) >> bits, unsigned(x[2]) >> bits, unsigned(x[3]) >> bits};}
+{return int4{int(unsigned(x[0]) >> bits), int(unsigned(x[1]) >> bits), int(unsigned(x[2]) >> bits), int(unsigned(x[3]) >> bits)};}
 
 forceinline int8 SIMD_VECTORCALL UnsignedRightBitShift(int8 x, int bits) noexcept
 {
-	return {
-		unsigned(x[0]) >> bits, unsigned(x[1]) >> bits, unsigned(x[2]) >> bits, unsigned(x[3]) >> bits,
-		unsigned(x[4]) >> bits, unsigned(x[5]) >> bits, unsigned(x[6]) >> bits, unsigned(x[7]) >> bits
+	return int8{
+		int(unsigned(x[0]) >> bits), int(unsigned(x[1]) >> bits), int(unsigned(x[2])) >> bits, int(unsigned(x[3]) >> bits),
+		int(unsigned(x[4]) >> bits), int(unsigned(x[5]) >> bits), int(unsigned(x[6]) >> bits), int(unsigned(x[7]) >> bits)
 	};
 }
 
@@ -779,12 +779,12 @@ template<class T> forceinline EnableForSimdWrapper<T, T&> SIMD_VECTORCALL operat
 namespace Simd {
 
 template<typename T> forceinline std::enable_if_t<
-	std::is_floating_point<ScalarTypeOf<T>>::value,
+	std::is_floating_point<ScalarTypeOf<std::remove_reference_t<T>>>::value,
 T> SIMD_VECTORCALL Truncate(T x) noexcept
 {return CastToFloat(TruncateToInt(x));}
 
 template<typename T> forceinline std::enable_if_t<
-	std::is_floating_point<ScalarTypeOf<T>>::value,
+	std::is_floating_point<ScalarTypeOf<std::remove_reference_t<T>>>::value,
 T> SIMD_VECTORCALL Round(T a)
 {
 	return CastToFloat(RoundToInt(a));
@@ -807,7 +807,7 @@ forceinline float4 SIMD_VECTORCALL Ceil(float4 x) {return _mm_ceil_ps(x);}
 
 #if(defined(SIMD_SSE_LEVEL) && SIMD_SSE_LEVEL >= SIMD_SSE_LEVEL_SSE2)
 forceinline int4 SIMD_VECTORCALL RoundToInt(float4 x) noexcept
-{return _mm_cvtps_epi32(x);}
+{return int4(_mm_cvtps_epi32(x));}
 #else
 forceinline int4 SIMD_VECTORCALL RoundToInt(float4 x) noexcept
 {return TruncateToInt(x + 0.5f) - ((x < 0) & 1);}
@@ -847,7 +847,7 @@ forceinline float8 SIMD_VECTORCALL Ceil(float8 x) {return _mm256_ceil_ps(x);}
 #ifdef SIMD_INT8_SUPPORT
 
 #if(defined(SIMD_SSE_LEVEL) && SIMD_SSE_LEVEL >= SIMD_SSE_LEVEL_AVX2)
-forceinline int8 SIMD_VECTORCALL RoundToInt(float8 x) noexcept {return _mm256_cvtps_epi32(x);}
+forceinline int8 SIMD_VECTORCALL RoundToInt(float8 x) noexcept {return int8(_mm256_cvtps_epi32(x));}
 #else
 forceinline int8 SIMD_VECTORCALL RoundToInt(float8 x) noexcept
 {return TruncateToInt(x + 0.5f) - ((x < 0) & 1);}
