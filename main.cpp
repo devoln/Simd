@@ -3,53 +3,9 @@
 #include <chrono>
 #include <iomanip>
 #include <Windows.h>
+#include "Simd.h"
 using namespace std;
 using namespace chrono;
-
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
-
-#ifdef __GNUC__
-
-void __cpuid(int* cpuinfo, int info)
-{
-	__asm__ __volatile__(
-		"xchg %%ebx, %%edi;"
-		"cpuid;"
-		"xchg %%ebx, %%edi;"
-		:"=a" (cpuinfo[0]), "=D" (cpuinfo[1]), "=c" (cpuinfo[2]), "=d" (cpuinfo[3])
-		:"0" (info)
-	);
-}
-
-unsigned long long _xgetbv(unsigned int index)
-{
-	unsigned int eax, edx;
-	__asm__ __volatile__(
-		"xgetbv;"
-		: "=a" (eax), "=d"(edx)
-		: "c" (index)
-	);
-	return ((unsigned long long)edx << 32) | eax;
-}
-
-#endif
-
-bool IsAvxSupported()
-{
-	int cpuinfo[4];
-	__cpuid(cpuinfo, 1);
-	bool supported = (cpuinfo[2] & (1 << 28)) != 0;
-	bool osxsaveSupported = (cpuinfo[2] & (1 << 27)) != 0;
-	if(osxsaveSupported && supported)
-	{
-		// _XCR_XFEATURE_ENABLED_MASK = 0
-		unsigned long long xcrFeatureMask = _xgetbv(0);
-		supported = (xcrFeatureMask & 0x6) == 0x6;
-	}
-	return supported;
-}
 
 
 void AddMultipliedScalar(float* dst, const float* src, int n, float coeff);
@@ -265,7 +221,7 @@ void RunTests(const float* srcs[], const float* coeffs, int chunkSize, int nChun
 	TEST(ExponentiateAddSSE);
 
 	cout << endl << "AVX" << endl;
-	if(IsAvxSupported())
+	if(Simd::IsAvxSupported())
 	{
 		TEST(AddMultipliedSimpleAVX);
 		TEST(AddMultipliedAVX);
@@ -293,7 +249,7 @@ void RunTests(const float* srcs[], const float* coeffs, int chunkSize, int nChun
 	else cout << "Not supported" << endl;
 
 	cout << endl << "FMA" << endl;
-	if(IsAvxSupported())
+	if(Simd::IsAvxSupported())
 	{
 		TEST(AddMultipliedFMA);
 		TEST(AddMultipliedRestrictFMA);
@@ -314,7 +270,7 @@ void RunTests(const float* srcs[], const float* coeffs, int chunkSize, int nChun
 	TEST_X(LinearMultiplyAddX2RestrictSSE, 2);
 	TEST_X(LinearMultiplyAddX2RestrictClassSSE, 2);
 	TEST_X(LinearMultiplyAddX2RestrictAVX, 2);
-	if(IsAvxSupported())
+	if(Simd::IsAvxSupported())
 	{
 		TEST_X(AddMultipliedX2RestrictAVX, 2);
 		TEST_X(AddMultipliedX3RestrictAVX, 3);
@@ -438,7 +394,7 @@ void PerfTests()
 	TEST_REDUCE(SumSSE);
 	TEST_REDUCE(SumSSE2);
 	TEST_REDUCE(SumSSE3);
-	if(IsAvxSupported())
+	if(Simd::IsAvxSupported())
 	{
 		TEST_REDUCE(SumAVX);
 		TEST_REDUCE(SumAVX2);

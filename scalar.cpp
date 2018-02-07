@@ -1,5 +1,4 @@
 #include <cmath>
-#include "Simd.h"
 
 void AddMultipliedScalar(float* dst, const float* src, int n, float coeff)
 {
@@ -134,19 +133,43 @@ void ExponentiateAddScalar(float* __restrict dst, const float* __restrict src, i
 	}
 }
 
+
+
+inline float Pow2Scalar(float x) noexcept
+{
+	const float fractional_part = x - float(int(x) - (x < 0));
+
+	float factor = float(-8.94283890931273951763e-03) + fractional_part * float(-1.89646052380707734290e-03);
+	factor = float(-5.58662282412822480682e-02) + factor * fractional_part;
+	factor = float(-2.40139721982230797126e-01) + factor * fractional_part;
+	factor = float(3.06845249656632845792e-01) + factor * fractional_part;
+	factor = float(1.06823753710239477000e-07) + factor * fractional_part;
+	x -= factor;
+
+	x *= float(1 << 23);
+	x += float((1 << 23) * 127);
+
+	int xi = int(x + 0.5f) - (x < 0);
+	return reinterpret_cast<float&>(xi);
+}
+
+inline float ExpScalar(float x) noexcept
+{return Pow2Scalar(x * float(1.442695040888963407359924681001892137426645954153));}
+
+
 void Exponentiate2AddScalar(float* __restrict dst, const float* __restrict src, int n, float dummy)
 {
 	float* dstEnd = dst + n;
 	while(dst != dstEnd)
 	{
-		dst[0] += Simd::Exp(src[0]);
-		dst[1] += Simd::Exp(src[1]);
-		dst[2] += Simd::Exp(src[2]);
-		dst[3] += Simd::Exp(src[3]);
-		dst[4] += Simd::Exp(src[4]);
-		dst[5] += Simd::Exp(src[5]);
-		dst[6] += Simd::Exp(src[6]);
-		dst[7] += Simd::Exp(src[7]);
+		dst[0] += ExpScalar(src[0]);
+		dst[1] += ExpScalar(src[1]);
+		dst[2] += ExpScalar(src[2]);
+		dst[3] += ExpScalar(src[3]);
+		dst[4] += ExpScalar(src[4]);
+		dst[5] += ExpScalar(src[5]);
+		dst[6] += ExpScalar(src[6]);
+		dst[7] += ExpScalar(src[7]);
 		dst += 8;
 		src += 8;
 	}

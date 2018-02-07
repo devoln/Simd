@@ -33,8 +33,6 @@ template<typename T> void TestVector(const T& x)
 	cout << "Round(x): " << Round(x) << endl;
 }
 
-bool IsAvxSupported();
-
 void SimdTest()
 {
 	float4 x4 = {-5.2f, -2.8f, 1.1f, 6.7f};
@@ -45,7 +43,7 @@ void SimdTest()
 	TestVector(x4_2);
 
 #ifdef SIMD_FLOAT8_SUPPORT
-	if(IsAvxSupported())
+	if(Simd::IsAvxSupported())
 	{
 		cout << endl;
 		float8 x8 = {-5.2f, -2.8f, 1.1f, 6.7f, -5, -2, 1, 6};

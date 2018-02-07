@@ -78,12 +78,71 @@
 #define SIMD_VECTORCALL
 #endif
 
+#define INTRA_DEFINE_EXPRESSION_CHECKER_WITH_CONDITION(checker_name, expr, condition) \
+	template<typename U> struct checker_name \
+	{\
+		template<typename T> static decltype((expr), std::integral_constant<bool, \
+			(condition)>()) func(typename std::remove_reference<T>::type*);\
+		template<typename T> static std::false_type func(...);\
+		using type = decltype(func<U>(nullptr));\
+		enum {_ = type::_};\
+	}
+
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
+#ifdef __GNUC__
+
+inline void __cpuid(int* cpuinfo, int info)
+{
+	__asm__ __volatile__(
+		"xchg %%ebx, %%edi;"
+		"cpuid;"
+		"xchg %%ebx, %%edi;"
+		:"=a" (cpuinfo[0]), "=D" (cpuinfo[1]), "=c" (cpuinfo[2]), "=d" (cpuinfo[3])
+		:"0" (info)
+	);
+}
+
+inline unsigned long long _xgetbv(unsigned int index)
+{
+	unsigned eax, edx;
+	__asm__ __volatile__(
+		"xgetbv;"
+		: "=a" (eax), "=d"(edx)
+		: "c" (index)
+	);
+	return (static_cast<unsigned long long>(edx) << 32) | eax;
+}
+
+#endif
+
+
+
 namespace Simd {
 
-template<class T> using ScalarTypeOf = typename std::remove_reference<decltype(T()[0])>::type;
-template<class T> using IntAnalogOf = typename std::remove_reference<decltype(T() < T())>::type;
+template<class T> using ScalarTypeOf = decltype(T()[0]+0);
+template<class T> using IntAnalogOf = decltype(T() < T());
+
+inline bool IsAvxSupported()
+{
+	int cpuinfo[4];
+	__cpuid(cpuinfo, 1);
+	bool supported = (cpuinfo[2] & (1 << 28)) != 0;
+	bool osxsaveSupported = (cpuinfo[2] & (1 << 27)) != 0;
+	if(osxsaveSupported && supported)
+	{
+		// _XCR_XFEATURE_ENABLED_MASK = 0
+		unsigned long long xcrFeatureMask = _xgetbv(0);
+		supported = (xcrFeatureMask & 0x6) == 0x6;
+	}
+	return supported;
+}
 
 }
+
+
 
 #if defined(__GNUC__) || defined(__clang__)
 
@@ -192,6 +251,16 @@ template<int i0a, int i1a, int i2b, int i3b, typename T> forceinline T Shuffle22
 		"Valid range of shuffle indices is [0; 3]");
 	return T{a[i0a], a[i1a], b[i2b], b[i3b]};
 }
+
+forceinline float4 SIMD_VECTORCALL InterleaveLow(float4 a, float4 b) noexcept {return float4{a[0], b[0], a[1], b[1]};}
+forceinline int4 SIMD_VECTORCALL InterleaveLow(int4 a, int4 b) noexcept {return int4{a[0], b[0], a[1], b[1]};}
+forceinline float4 SIMD_VECTORCALL InterleaveHigh(float4 a, float4 b) noexcept {return float4{a[2], b[2], a[3], b[3]};}
+forceinline int4 SIMD_VECTORCALL InterleaveHigh(int4 a, int4 b) noexcept {return int4{a[2], b[2], a[3], b[3]};}
+
+forceinline float8 SIMD_VECTORCALL InterleaveLow(float8 a, float8 b) noexcept {return float8{a[0], b[0], a[1], b[1], a[2], b[2], a[3], b[3]};}
+forceinline int8 SIMD_VECTORCALL InterleaveLow(int8 a, int8 b) noexcept {return int8{a[0], b[0], a[1], b[1], a[2], b[2], a[3], b[3]};}
+forceinline float8 SIMD_VECTORCALL InterleaveHigh(float8 a, float8 b) noexcept {return float8{a[4], b[4], a[5], b[5], a[6], b[6], a[7], b[7]};}
+forceinline int8 SIMD_VECTORCALL InterleaveHigh(int8 a, int8 b) noexcept {return int8{a[4], b[4], a[5], b[5], a[6], b[6], a[7], b[7]};}
 
 forceinline void End() noexcept {}
 
@@ -474,6 +543,12 @@ template<int n> forceinline float4 SIMD_VECTORCALL RotateLeft(float4 v) noexcept
 
 template<int n> forceinline float4 SIMD_VECTORCALL RotateRight(float4 v) noexcept {return RotateLeft<-n>(v);}
 
+
+forceinline float4 SIMD_VECTORCALL InterleaveLow(float4 a, float4 b) noexcept {return _mm_unpacklo_ps(a.Vec, b.Vec);}
+forceinline int4 SIMD_VECTORCALL InterleaveLow(int4 a, int4 b) noexcept {return _mm_unpacklo_epi32(a.Vec, b.Vec);}
+forceinline float4 SIMD_VECTORCALL InterleaveHigh(float4 a, float4 b) noexcept {return _mm_unpackhi_ps(a.Vec, b.Vec);}
+forceinline int4 SIMD_VECTORCALL InterleaveHigh(int4 a, int4 b) noexcept {return _mm_unpackhi_epi32(a.Vec, b.Vec);}
+
 forceinline float SIMD_VECTORCALL HorSum(float4 v) noexcept
 {
 #if SIMD_SSE_LEVEL >= SIMD_SSE_LEVEL_SSE3
@@ -581,6 +656,13 @@ template<int n> forceinline int8 SIMD_VECTORCALL RotateLeft(int8 v) noexcept
 
 template<int n> forceinline int8 SIMD_VECTORCALL RotateRight(int8 v) noexcept {return RotateLeft<-n>(v);}
 
+forceinline int8 SIMD_VECTORCALL InterleaveLow(int8 a, int8 b) noexcept
+{return _mm256_permute2f128_si256(_mm256_unpacklo_epi32(a.Vec, b.Vec), _mm256_unpackhi_epi32(a.Vec, b.Vec), 0x20);}
+
+forceinline int8 SIMD_VECTORCALL InterleaveHigh(int8 a, int8 b) noexcept
+{return _mm256_permute2f128_si256(_mm256_unpacklo_epi32(a.Vec, b.Vec), _mm256_unpackhi_epi32(a.Vec, b.Vec), 0x31);}
+
+
 forceinline int8 SIMD_VECTORCALL Max(int8 a, int8 b) noexcept {return _mm256_max_epi32(a.Vec, b.Vec);}
 forceinline int8 SIMD_VECTORCALL Min(int8 a, int8 b) noexcept {return _mm256_min_epi32(a.Vec, b.Vec);}
 
@@ -676,6 +758,12 @@ template<int n> forceinline float8 SIMD_VECTORCALL RotateLeft(float8 v) noexcept
 {return Shuffle<n & 7, (n + 1) & 7, (n + 2) & 7, (n + 3) & 7, (n + 4) & 7, (n + 5) & 7, (n + 6) & 7, (n + 7) & 7>(v);}
 
 template<int n> forceinline float8 SIMD_VECTORCALL RotateRight(float8 v) noexcept {return RotateLeft<-n>(v);}
+
+forceinline float8 SIMD_VECTORCALL InterleaveLow(float8 a, float8 b) noexcept
+{return _mm256_permute2f128_ps(_mm256_unpacklo_ps(a.Vec, b.Vec), _mm256_unpackhi_ps(a.Vec, b.Vec), 0x20);}
+
+forceinline float8 SIMD_VECTORCALL InterleaveHigh(float8 a, float8 b) noexcept
+{return _mm256_permute2f128_ps(_mm256_unpacklo_ps(a.Vec, b.Vec), _mm256_unpackhi_ps(a.Vec, b.Vec), 0x31);}
 
 #endif
 
@@ -850,7 +938,7 @@ forceinline float8 SIMD_VECTORCALL Ceil(float8 x) {return _mm256_ceil_ps(x);}
 forceinline int8 SIMD_VECTORCALL RoundToInt(float8 x) noexcept {return int8(_mm256_cvtps_epi32(x));}
 #else
 forceinline int8 SIMD_VECTORCALL RoundToInt(float8 x) noexcept
-{return TruncateToInt(x + 0.5f) - ((x < 0) & 1);}
+{return TruncateToInt(x + Set<float8>(0.5f)) - ((x < Set<float8>(0)) & 1);}
 #endif
 
 #if(!defined(SIMD_SSE_LEVEL) || SIMD_SSE_LEVEL < SIMD_SSE_LEVEL_AVX)
@@ -1008,62 +1096,5 @@ T> SIMD_VECTORCALL Log2(T x) {return Log2Order<5>(x);}
 template<typename T> inline std::enable_if_t<
 	std::is_same<ScalarTypeOf<T>, float>::value,
 T> SIMD_VECTORCALL Log(T x) {return LogOrder<5>(x);}
-
-
-
-forceinline float Pow2(float x) noexcept
-{
-	const float fractional_part = x - float(int(x) - (x < 0));
-
-	float factor = float(-8.94283890931273951763e-03) + fractional_part * float(-1.89646052380707734290e-03);
-	factor = float(-5.58662282412822480682e-02) + factor * fractional_part;
-	factor = float(-2.40139721982230797126e-01) + factor * fractional_part;
-	factor = float(3.06845249656632845792e-01) + factor * fractional_part;
-	factor = float(1.06823753710239477000e-07) + factor * fractional_part;
-	x -= factor;
-
-	x *= float(1 << 23);
-	x += float((1 << 23) * 127);
-
-	int xi = int(x + 0.5f) - (x < 0);
-	return reinterpret_cast<float&>(xi);
-}
-
-forceinline float Exp(float x) noexcept
-{return Pow2(x * float(1.442695040888963407359924681001892137426645954153));}
-
-#if 0
-
-EXPORT CONST float xerff_u1(float a)
-{
-	float s = a, t, u;
-	Sleef_float2 d;
-
-	a = fabsfk(a);
-	int o0 = a < 1.1f, o1 = a < 2.4f, o2 = a < 4.0f;
-	u = o0 ? (a*a) : a;
-
-	t = o0 ? +0.7089292194e-4f : o1 ? -0.1792667899e-4f : -0.9495757695e-5f;
-	
-	t = mlaf(t, u, o0 ? -0.7768311189e-3f : o1 ? +0.3937633010e-3f : +0.2481465926e-3f); //t*u+(o0? ...)
-	t = mlaf(t, u, o0 ? +0.5159463733e-2f : o1 ? -0.3949181177e-2f : -0.2918176819e-2f);
-	t = mlaf(t, u, o0 ? -0.2683781274e-1f : o1 ? +0.2445474640e-1f : +0.2059706673e-1f);
-	t = mlaf(t, u, o0 ? +0.1128318012e+0f : o1 ? -0.1070996150e+0f : -0.9901899844e-1f);
-	d = dfmul_f2_f_f(t, u);
-	d = dfadd2_f2_f2_f2(d, o0 ? dfx(-0.376125876000657465175213237214e+0) :
-		o1 ? dfx(-0.634588905908410389971210809210e+0) :
-		dfx(-0.643598050547891613081201721633e+0));
-	d = dfmul_f2_f2_f(d, u);
-	d = dfadd2_f2_f2_f2(d, o0 ? dfx(+0.112837916021059138255978217023e+1) :
-		o1 ? dfx(-0.112879855826694507209862753992e+1) :
-		dfx(-0.112461487742845562801052956293e+1));
-	d = dfmul_f2_f2_f(d, a);
-	d = o0 ? d : dfadd_f2_f_f2(1.0, dfneg_f2_f2(expk2f(d)));
-	u = mulsignf(o2 ? (d.x + d.y) : 1, s);
-	u = xisnanf(a) ? SLEEF_NANf : u;
-	return u;
-}
-
-#endif
 
 }
